@@ -15,21 +15,44 @@
 
 #include <yirl/all.h>
 
+static Entity *tf;
+static Entity *tf_do_action;
+static Entity *tf_set_globals;
+
 void *action(int nbArgs, void **args)
 {
 	printf("action\n");
-	return NULL;
+	return yesCall(tf_do_action, args[1]);
 }
 
 void *game_init(int nbArgs, void **args)
 {
 	Entity *g = args[0];
 
+	tf = ygGet("tactical-fight");
+	tf_do_action = yeGet(tf, "do_action");
+	tf_set_globals = yeGet(tf, "set_globals");
 	YEntityBlock {
 		g.action = action;
+		g.entries = {};
+		g.pj = {};
+	};
+
+	Entity *pj = yeGet(g, "pj");
+	Entity *pj_sp = yeCreateArray(pj, "sprite");
+	YEntityBlock {
+		pj.name = "Eon";
+		pj_sp.path = "Sprites/guardBlue64.png";
+		pj_sp.disposition = "lrdu";
+		pj_sp.size = 32;
+		pj_sp.length = 3;
 	}
 
-	void *ret = ywidNewWidget(g, "canvas");
+	Entity *mainScreen = ywCreateCanvasEnt(g, "mainScreen");
+	void *ret = ywidNewWidget(g, "container");
+	ywPushNewWidget(g, mainScreen, 0);
+	yesCall(tf_set_globals, g, NULL, yeGet(g, "pj"));
+	yesCall(yeGet(tf, "init_mode"), NULL);
 	return ret;
 }
 
@@ -48,9 +71,15 @@ void *mod_init(int nbArg, void **args)
 		mod.test_mscb["<type>"] = "MSCB";
 		mod.test_rc.background = "rgba: 10 150 255 255";
 		mod["window name"] = "Mecha-Super-Cook-Battle";
+		mod["pre-load"] = {};
+		mod["pre-load"][0] = {};
+		mod["pre-load"][0].type = "module";
+		mod["pre-load"][0].file = "./tactical-fight";
+		mod["pre-load"][1] = {};
+		mod["pre-load"][1].type = "module";
+		mod["pre-load"][1].file = "./generic_handler";
 	}
 
 	ywidAddSubType(init);
-	printf("Gretting and Salutation !\n");
 	return mod;
 }

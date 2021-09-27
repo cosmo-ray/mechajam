@@ -36,6 +36,10 @@ local COL_NEAR_ALLY = "rgba: 55 255 50 130"
 local COL_FAR_ENEMY = "rgba: 155 100 100 130"
 local COL_NEAR_ENEMY = "rgba: 255 105 50 130"
 
+local main_widget = main_widget
+local print_message = nil
+local main_player = nil
+
 local function begin_turn_init(tdata)
    cur_char = tdata.all[current_character]
    cur_char[4][IDX_CUR_ACTION_POINT] = Entity.new_float(cur_char[4][IDX_MAX_ACTION_POINT]:to_int())
@@ -161,6 +165,10 @@ local function switch_to_attack_mode(target, ap_cost)
 end
 
 function do_tactical_fight(eve)
+   if TACTICAL_FIGHT_MODE == MODE_NO_TACTICAL_FIGHT then
+      return YEVE_ACTION
+   end
+   print("do_tactical_fight !!")
    local tdata = main_widget.tactical
    local wid_rect = main_widget["wid-pix"]
    local wid_w = ywRectW(wid_rect)
@@ -178,8 +186,12 @@ function do_tactical_fight(eve)
       block_square = nil
    end
    if TACTICAL_FIGHT_MODE == MODE_TACTICAL_FIGHT_INIT then
+      if tdata == nil then
+	 main_widget.tactical = {}
+	 tdata = main_widget.tactical
+      end
       main_widget.cam_offset = Pos.new(0, BAR_H / 2).ent
-      printMessage(main_widget, nil,
+      print_message(main_widget, 
 		   "TACTICAL FIGHT MODE START, unimlemented press 'ESC' to quit")
       TACTICAL_FIGHT_MODE = MODE_PLAYER_TURN
 
@@ -192,7 +204,7 @@ function do_tactical_fight(eve)
       local args = tdata.args
       local tmp_allies = {}
       local tmp_allies_idx = 1
-      local allies = phq.pj.allies
+      local allies = main_player.allies
 
       for i = 0, yeLen(allies) - 1 do
 	 tmp_allies[tmp_allies_idx] = yeGetKeyAt(allies, i)
@@ -206,8 +218,8 @@ function do_tactical_fight(eve)
 	    for j = 0, yeLen(a) - 1 do
 	       local name = yeCreateYirlFmtString(a[j][0])
 	       print("move: ", a[j], yeGetString(name),
-		     yeGetString(name) == yeGetString(phq.pj.name))
-	       if yeGetString(name) == yeGetString(phq.pj.name) then
+		     yeGetString(name) == yeGetString(main_player.name))
+	       if yeGetString(name) == yeGetString(main_player.name) then
 		  generic_handlerMoveXY(main_widget.pj,
 					yeGetInt(a[j][1]),
 					yeGetInt(a[j][2]))
@@ -251,8 +263,8 @@ function do_tactical_fight(eve)
       end
       local pjPos = Pos.wrapp(Entity.new_copy(ylpcsHandePos(main_widget.pj)))
 
-      push_character(tdata, tdata.goods, phq.pj, main_widget.pj,
-		     phq.pj.name, HERO_TEAM)
+      push_character(tdata, tdata.goods, main_player, main_widget.pj,
+		     main_player.name, HERO_TEAM)
       for i = 1, #tmp_allies do
 
 	 local npcn = tmp_allies[i]
@@ -447,12 +459,12 @@ function do_tactical_fight(eve)
 	    if block then
 	       if nearest_target then
 		  if target_distance >= reach_distance then
-		     printMessage(main_widget, nil,
+		     print_message(main_widget,
 				  "target is out of reac (distance: " .. target_distance .. ") !")
 		  elseif nearest_target[3]:to_int() == HERO_TEAM then
-		     printMessage(main_widget, nil, "can't attack allies")
+		     print_message(main_widget, "can't attack allies")
 		  else
-		     printMessage(main_widget, nil, cur_char[2]:to_string() .. " attack: " .. nearest_target[2]:to_string())
+		     print_message(main_widget, cur_char[2]:to_string() .. " attack: " .. nearest_target[2]:to_string())
 		     switch_to_attack_mode(nearest_target, attack_cost)
 		  end
 		  print("attack on", nearest_target[2])
@@ -518,4 +530,24 @@ function do_tactical_fight(eve)
 
    reposeCam(main_widget, cur_char[1])
    return YEVE_ACTION
+end
+
+local function set_globals(m_wid, print_msg, pc)
+   main_widget = Entity.wrapp(m_wid)
+   main_player = Entity.wrapp(pc)
+   -- note that print_message could be a function
+   print_message = Entity.wrapp(print_msg)
+end
+
+local function init_mode()
+   TACTICAL_FIGHT_MODE = MODE_TACTICAL_FIGHT_INIT
+end
+
+function mod_init(mod)
+   mod = Entity.wrapp(mod)
+   mod.name = "tactical-fight"
+   yeCreateFunction(do_tactical_fight, mod, "do_action")
+   yeCreateFunction(set_globals, mod, "set_globals")
+   yeCreateFunction(init_mode, mod, "init_mode")
+   return mod
 end
